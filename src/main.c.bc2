@@ -1,0 +1,143 @@
+/** 
+ * Name: main.c
+ * @author Matej Franek
+ * @brief Hra Simon Says
+ * @date 29.5.2026
+ * @version 1
+ * Description: Hra "Simon Says" pro KL25Z. Hráč musí opakovat sekvenci blikání LED, která se postupně prodlužuje.
+ * Každé kolo se přidá další náhodné tlačítko (1-4) do sekvence. Hráč musí stisknout správná tlačítka ve správném pořadí.
+ * Pokud hráč udělá chybu, hra končí a zobrazuje se skóre. Pokud hráč dosáhne maximálního skóre, zobrazí se speciální animace.
+ *
+ */
+
+
+//includy
+#include "wdog.h"
+#include "MKL25Z4.h"
+#include "ledfun.h"
+#include "random.h"
+#include <stdint.h>
+#include "button.h"
+
+
+//makra
+#define maxskore 255
+
+//promenne
+uint32_t seedgeneratoru;
+uint8_t skore=0;
+uint32_t sekvence[maxskore];  // pole pro ulozeni sekvence tlacitek, ktera se bude postupne prodluzovat
+uint32_t delka_sekvence = 0;  // delka sekvece kterou musi hrac zopakovat v danem kole
+uint32_t index_hrace = 0;     // kolikate tlacitko hrac macka
+volatile uint8_t kontrola_aktivni = 0;
+
+
+
+
+__attribute__ ((weak)) int main(void)
+{
+	
+	wdog_init(WDOG_CONF_DIS);
+	initilize_led();
+	buttoninit();
+	NVIC_SetPriority(PORTA_IRQn,2);
+	NVIC_EnableIRQ(PORTA_IRQn);
+	heavyFunction();
+	seedgeneratoru= SysTick->VAL;
+	while (1) {
+	//generace
+        if (delka_sekvence < maxskore) {
+            sekvence[delka_sekvence] = (xorshift32(&seedgeneratoru) & 3) + 1;
+            delka_sekvence++; 
+        }
+        
+        index_hrace = 0; 
+        
+        // Blikani
+        kontrola_aktivni = 0; 
+        for (uint32_t i = 0; i < delka_sekvence; i++) {
+            set_led(sekvence[i]*2, ON);
+			set_led((sekvence[i]*2)-1, ON);
+            heavyFunction(); 
+            set_led(sekvence[i]*2, OFF);
+			set_led((sekvence[i]*2)-1, OFF);
+            heavyFunction(); 
+        }
+
+        kontrola_aktivni = 1;
+        while (kontrola_aktivni == 1) {
+            __WFI(); // Ceka na preruseni z tlacitek
+        }
+
+        // vyhodnoceni
+        if (delka_sekvence == 0) {
+            // --- GAME OVER ---
+            led_test();                
+            for (uint8_t i = 0; i < 3; i++)
+			{
+				heavyFunction();
+				led_test();
+			}
+			
+
+            vykresli(skore);           
+            for (uint8_t  i = 0; i < 10; i++)
+			{
+				heavyFunction();
+			}
+
+            led_test();
+            
+            skore = 0;
+        } 
+        else {
+            //kolo dobre
+			if(skore<maxskore){
+            skore++;                   
+            heavyFunction();           
+			}
+			else if (skore==maxskore)
+			{	
+				for (uint8_t i = 0; i < 3; i++)
+				{
+					heavyFunction();
+					led_test();
+					heavyFunction();
+				}
+				for (uint8_t i = 0; i < 3; i++)
+				{
+					heavyFunction();
+					heavyFunction();
+					vykresli(skore);
+				}
+			
+			}
+			
+		}
+    }
+    return 0;
+}
+void PORTA_IRQHandler(void)
+{
+    uint32_t flags = PORTA->ISFR;
+    uint8_t stisknuto = 0;
+
+    // 1. zjistime tlacitko a vymazeme hardwarovy flag
+    if (flags & (1 << 4))  { PORTA->PCR[4] |= PORT_PCR_ISF_MASK;  stisknuto = 1; }
+    else if (flags & (1 << 5)) { PORTA->PCR[5] |= PORT_PCR_ISF_MASK;  stisknuto = 2; }
+    else if (flags & (1 << 12)) { PORTA->PCR[12] |= PORT_PCR_ISF_MASK;  stisknuto = 3; }
+    else if (flags & (1 << 13)) { PORTA->PCR[13] |= PORT_PCR_ISF_MASK;  stisknuto = 4; }
+
+    // 2. kontrola hry
+    if (stisknuto != 0 && kontrola_aktivni == 1) {
+        if (stisknuto == sekvence[index_hrace]) {
+            index_hrace++;
+            if (index_hrace >= delka_sekvence) {
+                kontrola_aktivni = 0; // Kolo OK
+            }
+        } else {
+            kontrola_aktivni = 0; 
+            delka_sekvence = 0;   // GAME OVER
+        }
+    }
+}

@@ -1,0 +1,347 @@
+/*
+ * Name: main.c
+ * Author: You
+ *
+ * This is a stub. Write your code here.
+ *
+ */
+
+#include "wdog.h"
+//#include "littleHelper.h"
+#include "MKL25Z4.h"
+#include "ledfun.h"
+#include "random.h"
+#include <stdint.h>
+#include "button.h"
+//vlastni datove typy
+/*
+typedef enum {
+	ON=0,
+	OFF=1
+}Stav;
+*/
+//funkce
+
+
+void hra(void);
+//void initilize_led();
+//void setup();
+//void set_led(uint32_t cislo_led,Stav state);
+//void led_test();
+//void vykresli(uint8_t cislo);
+//uint32_t xorshift32(uint32_t *state);
+
+//promenne
+uint32_t seedgeneratoru;
+
+//uint32_t pole[8]={1,2,3,4,5,6,7,8};
+void buttoninit();
+uint8_t skore=0;
+uint32_t sekvence[2];       // Paměť pro celou nabalující se hru
+uint32_t delka_sekvence = 0;  // Aktuální počet kroků (v 1. kole = 1, ve 2. kole = 2...)
+uint32_t index_hrace = 0;     // Kolikáté tlačítko zrovna hráč mačká
+volatile uint8_t kontrola_aktivni = 0;
+
+
+__attribute__ ((weak)) int main(void)
+{
+	
+	wdog_init(WDOG_CONF_DIS);
+	initilize_led();
+	buttoninit();
+	//led_test();
+	//set_led(1, ON);
+	NVIC_SetPriority(PORTA_IRQn,2);
+	NVIC_EnableIRQ(PORTA_IRQn);
+	seedgeneratoru= SysTick->VAL;
+	while (1) {
+		/*
+		uint32_t nahodna_led = (xorshift32(&seedgeneratoru) & 3) + 1;
+		nahodna_led*=2;
+		set_led(nahodna_led, ON);
+		set_led(nahodna_led-1, ON);
+		heavyFunction();
+		set_led(nahodna_led, OFF);
+		set_led(nahodna_led-1, OFF);
+		heavyFunction();
+		__WFI();
+		
+        if (delka_sekvence < 254) {
+            sekvence[delka_sekvence] = (xorshift32(&seedgeneratoru) & 3) + 1;
+            delka_sekvence++;
+        }
+    
+        index_hrace = 0; 
+        
+   
+        kontrola_aktivni = 0; 
+        for (uint32_t i = 0; i < delka_sekvence; i++) {
+            set_led(sekvence[i]*2, ON);
+			set_led((sekvence[i]*2)-1, ON);
+            heavyFunction();
+            set_led(sekvence[i]*2, OFF);
+			set_led((sekvence[i]*2)-1, OFF);
+            heavyFunction(); 
+        }
+        kontrola_aktivni = 1;
+        
+
+        while (kontrola_aktivni == 1) {
+            __WFI(); 
+        }
+		
+
+
+
+
+	}
+
+	return 0;*/
+	//generace
+        if (delka_sekvence < 2) {
+            sekvence[delka_sekvence] = (xorshift32(&seedgeneratoru) & 3) + 1;
+            delka_sekvence++; 
+        }
+        
+        index_hrace = 0; 
+        
+        // Blikani
+        kontrola_aktivni = 0; 
+        for (uint32_t i = 0; i < delka_sekvence; i++) {
+            set_led(sekvence[i]*2, ON);
+			set_led((sekvence[i]*2)-1, ON);
+            heavyFunction(); 
+            set_led(sekvence[i]*2, OFF);
+			set_led((sekvence[i]*2)-1, OFF);
+            heavyFunction(); 
+        }
+
+        // 
+        kontrola_aktivni = 1;
+        while (kontrola_aktivni == 1) {
+            __WFI(); 
+        }
+
+        // vyhodnoceni
+        if (delka_sekvence == 0) {
+            // --- GAME OVER ---
+            led_test();                
+            for (uint8_t i = 0; i < 3; i++)
+			{
+				heavyFunction();
+				led_test();
+			}
+			
+
+            vykresli(skore);           
+            for (uint8_t  i = 0; i < 10; i++)
+			{
+				heavyFunction();
+			}
+
+            led_test();
+            
+            skore = 0;
+        } 
+        else {
+            //kolo dobre
+            skore++;                   
+            
+            heavyFunction();           
+        }
+    }
+    return 0;
+
+}
+/*
+void hra(void){
+	uint8_t skore,skorenew;
+	skore=196;
+	skorenew=(skore&255);
+	
+
+	}
+*/
+/*
+void setup(){
+	PORTB->PCR[8]|=(1<<8);
+	GPIOB->PDDR|=(1<<8);
+	GPIOB->PDOR&=~(1<<8);
+	}
+*/
+/*
+void set_led(uint32_t cislo_led, Stav state){
+	uint32_t pinsB[4]={8,9,10,11};
+	uint32_t pinsC[4]={10,11,12,13};
+			//PORTB
+			if(cislo_led<5){
+            	if(state == ON){
+            	    GPIOB->PDOR &= ~(1 << pinsB[cislo_led-1]); //zapnout
+            	}
+				else{
+            	    GPIOB->PDOR |= (1 << pinsB[cislo_led-1]);  //vypnout
+            	}
+
+			}
+			else if (cislo_led>4&&cislo_led<9)
+			{        
+				if(state == ON){
+                	GPIOC->PDOR &= ~(1 << pinsC[cislo_led-5]); //zapnout
+            	} 
+				else{
+                	GPIOC->PDOR |= (1 << pinsC[cislo_led-5]);  //vypnout
+				}
+			}
+			else{
+				return;
+			}
+
+}
+*/
+/*
+void initilize_led(){
+	//prvni 4 ledky 1-4
+
+	//led 1
+	PORTB->PCR[8]|=(1<<8);//PCR[8] znamena je cislo ktere jde za portb na diagramu |=(1<<8) zapisujeme do mux at je GPIO
+	GPIOB->PDDR|=(1<<8);//PDDR|=(1<<8) zapisujeme ze chceme aby byl pin 8 jako output a 8 znamena ktery pin
+	GPIOB->PDOR|=(1<<8);//PDOR&=~(1<<8) pouzivame inverzni logiku protoze pin dodava stejne napeti takze ~1 z toho udela 0 a pin nedodava napeti a umoznuje tak prutok napeti  
+
+	//led2
+	PORTB->PCR[9]|=(1<<8);
+	GPIOB->PDDR|=(1<<9);
+	GPIOB->PDOR|=(1<<9);
+
+	//led 3
+	PORTB->PCR[10]|=(1<<8);
+	GPIOB->PDDR|=(1<<10);
+	GPIOB->PDOR|=(1<<10);
+
+
+	//led 4
+	PORTB->PCR[11]|=(1<<8);
+	GPIOB->PDDR|=(1<<11);
+	GPIOB->PDOR|=(1<<11);
+	//druhe 4 ledky 5-8
+	
+	//led 5
+	PORTC->PCR[10]|=(1<<8);
+	GPIOC->PDDR|=(1<<10);
+	GPIOC->PDOR|=(1<<10);
+
+	//led 6
+	PORTC->PCR[11]|=(1<<8);
+	GPIOC->PDDR|=(1<<11);
+	GPIOC->PDOR|=(1<<11);
+
+	//led 7
+	PORTC->PCR[12]|=(1<<8);
+	GPIOC->PDDR|=(1<<12);
+	GPIOC->PDOR|=(1<<12);
+
+	//led 8
+	PORTC->PCR[13]|=(1<<8);
+	GPIOC->PDDR|=(1<<13);
+	GPIOC->PDOR|=(1<<13);
+	}
+*/
+/*
+void led_test(){
+
+	GPIOB->PDOR&=~(1<<8);
+	GPIOB->PDOR&=~(1<<9);
+	GPIOB->PDOR&=~(1<<10);
+	GPIOB->PDOR&=~(1<<11);
+	GPIOC->PDOR&=~(1<<10);
+	GPIOC->PDOR&=~(1<<11);
+	GPIOC->PDOR&=~(1<<12);
+	GPIOC->PDOR&=~(1<<13);
+	heavyFunction();
+	GPIOB->PDOR|=(1<<8);
+	GPIOB->PDOR|=(1<<9);
+	GPIOB->PDOR|=(1<<10);
+	GPIOB->PDOR|=(1<<11);
+	GPIOC->PDOR|=(1<<10);
+	GPIOC->PDOR|=(1<<11);
+	GPIOC->PDOR|=(1<<12);
+	GPIOC->PDOR|=(1<<13);
+	}
+*/
+/*
+void vykresli(uint8_t cislo){
+	for (uint8_t i = 0; i < 8; i++)
+	{
+		if((cislo&(1<<i))!=0){
+			set_led(i+1,ON);
+		}
+	}
+}
+*/
+
+/*uint32_t xorshift32(uint32_t *state) {
+    uint32_t x = *state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    return *state = x; // Update and return state
+}
+*/
+
+/*
+void buttoninit(){
+
+	PORTA->PCR[4]|=0b1010<<PORT_PCR_IRQC_SHIFT;
+	PORTA->PCR[5]|=0b1010<<PORT_PCR_IRQC_SHIFT;
+	PORTA->PCR[2]|=0b1010<<PORT_PCR_IRQC_SHIFT;
+	PORTA->PCR[3]|=0b1010<<PORT_PCR_IRQC_SHIFT;
+	//button 1
+	PORTA->PCR[4]|=0b1010<<PORT_PCR_IRQC_SHIFT;
+	PORTA->PCR[4]|=1<<PORT_PCR_MUX_SHIFT;
+    GPIOA->PDDR&=~(1<<4);
+
+
+	//button 2
+	PORTA->PCR[5]|=0b1010<<PORT_PCR_IRQC_SHIFT;
+	PORTA->PCR[5]|=1<<PORT_PCR_MUX_SHIFT;
+    GPIOA->PDDR&=~(1<<5);
+
+	
+	
+	//button 3
+	PORTA->PCR[12]|=0b1010<<PORT_PCR_IRQC_SHIFT;
+	PORTA->PCR[12]|=1<<PORT_PCR_MUX_SHIFT;
+    GPIOA->PDDR&=~(1<<12);
+	
+	
+	//button 4
+	PORTA->PCR[13]|=0b1010<<PORT_PCR_IRQC_SHIFT;
+	PORTA->PCR[13]|=1<<PORT_PCR_MUX_SHIFT;
+    GPIOA->PDDR&=~(1<<13);
+
+
+}
+*/
+void PORTA_IRQHandler(void)
+{
+    uint32_t flags = PORTA->ISFR;
+    uint8_t stisknuto = 0;
+
+    // 1. Zjistíme tlačítko a HNED vymažeme hardwarový příznak (flag)
+    if (flags & (1 << 4))  { PORTA->PCR[4] |= PORT_PCR_ISF_MASK;  stisknuto = 1; }
+    else if (flags & (1 << 5)) { PORTA->PCR[5] |= PORT_PCR_ISF_MASK;  stisknuto = 2; }
+    else if (flags & (1 << 12)) { PORTA->PCR[12] |= PORT_PCR_ISF_MASK;  stisknuto = 3; }
+    else if (flags & (1 << 13)) { PORTA->PCR[13] |= PORT_PCR_ISF_MASK;  stisknuto = 4; }
+
+    // 2. Samotná kontrola hry (žádné blikání, jen čistá matematika)
+    if (stisknuto != 0 && kontrola_aktivni == 1) {
+        if (stisknuto == sekvence[index_hrace]) {
+            index_hrace++;
+            if (index_hrace >= delka_sekvence) {
+                kontrola_aktivni = 0; // Kolo dokončeno úspěšně
+            }
+        } else {
+            kontrola_aktivni = 0; 
+            delka_sekvence = 0;   // GAME OVER
+        }
+    }
+}
